@@ -2,114 +2,183 @@
 #include <Adafruit_sensor.h>
 #include <DHT.h>
 #include <SdFat.h>
-#include <iarduino_RTC.h>
+#include <DS3232RTC.h>      // https://github.com/JChristensen/DS3232RTC /SDA A4 pin, SCL A5 pin
 #include <SimpleTimer.h> 
 #include <U8glib.h>
 
 #include "graphics.h"
 
+#define DEBUG
+
 DHT dht(2, DHT22); //Aosong AM2320, D2 pin
-iarduino_RTC time(RTC_DS3231); //SDA A4 pin, SCL A5 pin
 U8GLIB_PCD8544 u8g(4, 5, 6); //RST D6 pin, CE D4 pin, DC (data/commands) D5 pin,CLK D13 pin, DIN D11 pin PCD8544 48x84
 SdFat SD; //CS D10 pin, SCK D13 pin, MISO D12 pin, MOSI D11 pin
 
 SimpleTimer timer;
 File dataFile;
 float freeSpace; 
-float h,t = 0;
-char h_str[4];
-char t_str[4];
-char dataString[6][32];
-uint8_t index = 0;
+float h,t,max_t,min_t = NAN;
 
-bool cardInserted = 0;
+bool cardInserted = false;
 bool dotsBlink = false;
 
-
+#ifdef DEBUG
+#define PRINTLNF(s)   { Serial.println(F(s)); }
+#define PRINTLN(s,v)  { Serial.print(F(s)); Serial.println(v); }
+#define PRINT(s,v)  { Serial.print(F(s)); Serial.print(v); }
+#else
+#define PRINTLNF(s)
+#define PRINTLN(s,v)
+#define PRINT(s,v)
+#endif
 
 void dateTime(uint16_t* fileDate, uint16_t* fileTime) { //callback for timestamps. access, creation, and modify, are set when a file is created. 
-  *fileDate = FAT_DATE(static_cast<uint16_t>(2000+time.year), time.month, time.day); //return date using FAT_DATE macro to format fields
-  *fileTime = FAT_TIME(time.Hours, time.minutes, time.seconds); //return time using FAT_TIME macro to format fields
+ *fileDate = FAT_DATE(static_cast<uint16_t>(year()), month(), day()); //return date using FAT_DATE macro to format fields
+ *fileTime = FAT_TIME(hour(), minute(), second()); //return time using FAT_TIME macro to format fields
+}
+
+float cardFreeSpace() { 
+  return 0.000488 * SD.vol()->freeClusterCount() * SD.vol()->blocksPerCluster();  //MB (MB = 1,048,576 bytes)
+  // freeSpace = 0.000512*SD.vol()->freeClusterCount()*SD.vol()->blocksPerCluster(); //MB (MB = 1,000,000 bytes)
 }
 
 void draw() {
   char out_str[5];
-  time.gettime(); //refresh internal clock
   u8g.firstPage();  
   do {
-    u8g.drawXBMP(0, 20, 16, 14, hum_bitmap);
+    u8g.drawXBMP(0, 18, 16, 14, hum_bitmap);
     u8g.drawXBMP(0, 34, 8, 14, temp_bitmap);
-    u8g.setFont(u8g_font_courB12r);
-    u8g.drawStr(20, 34, h_str);
-    u8g.drawStr(10, 48, "+");
-    u8g.drawStr(20, 48, t_str);
+    u8g.setFont(u8g_font_10x20r);
+    if (!isnan(h)) {
+      sprintf(out_str,"%02d",static_cast<int>(h)); 
+      u8g.drawStr(18, 31, out_str); //print decimal
+      u8g.drawStr(34, 31, ".");
+      dtostrf(h, 4, 1, out_str);
+      u8g.drawStr(42,31, out_str+3); //print precision
+    }
+    if (!isnan(t)) {
+      (t > 0) ? u8g.drawStr(8, 48, "+") : u8g.drawStr(8, 48, "-");
+      float t_abs = abs(t); 
+      uint8_t x = 0;
+      if (t_abs < 10) 
+        x = 10;
+      sprintf(out_str,"%d",static_cast<int>(t_abs));
+      u8g.drawStr(18, 48, out_str); //print decimal
+      u8g.drawStr(34-x, 48, ".");
+      dtostrf(t_abs, 4, 1, out_str);
+      u8g.drawStr(42-x, 48, out_str+3); //print precision
+    }
+    dotsBlink ? sprintf(out_str,"%02d %02d",hour(),minute()) : sprintf(out_str,"%02d:%02d",hour(),minute()); //draw time
+    u8g.drawStr(0, 13, out_str);
 
-    dotsBlink ? sprintf(out_str,"%d %d",time.Hours,time.minutes) : sprintf(out_str,"%d:%d",time.Hours,time.minutes); //draw time
-    u8g.drawStr(0, 12, out_str);
-    // u8g.setFont(u8g_font_courB08r);
-    // sprintf(out_str,"%4.1f",freeSpace); //draw free space
-    // u8g.drawStr(0, 48, "free");
-    // u8g.drawStr(10, 48, out_str);
+    u8g.setFont(u8g_font_6x13Br);
+    if (max_t > 0) //print max temperature
+      u8g.drawStr(54, 26, "+"); 
+    else if (max_t < 0) 
+      u8g.drawStr(54, 26, "-"); 
+    dtostrf(abs(max_t), 4, 1, out_str);
+    u8g.drawStr(60, 26, out_str); 
+    if (min_t > 0) //print min temperature
+      u8g.drawStr(54, 42, "+");
+    else if (min_t < 0)
+      u8g.drawStr(54, 42, "-"); 
+    dtostrf(abs(min_t), 4, 1, out_str);
+    u8g.drawStr(60, 42, out_str); 
 
-    // u8g.drawStr(10, 20, out_str);
+    u8g.setFont(u8g_font_4x6r);
+    u8g.drawStr(57, 31, "max");
+    u8g.drawStr(70, 31, "t");
+    u8g.drawStr(57, 48, "min");
+    u8g.drawStr(70, 48, "t");
 
+
+    if (cardInserted) { //draw free space
+      u8g.setFont(u8g_font_6x13Br);
+      dtostrf(freeSpace, 4, 1, out_str); 
+      u8g.drawStr(59, 9, out_str);
+      u8g.setFont(u8g_font_4x6r);
+      u8g.drawStr(57, 15, "free MB");
+    }
   } while( u8g.nextPage() );
   dotsBlink ^=1; //dots blicking
 }
 
 void readData() {
   h = dht.readHumidity();
-  if (!isnan(h)) 
-    dtostrf(h, 4, 1, h_str);
   t = dht.readTemperature();
-  if (!isnan(t))
-    dtostrf(t, 4, 1, t_str);
-  sprintf(dataString[index],"%s,%s,%s",h_str,t_str,gettime("d-m-Y,H:i:s"));//fill data string array like 45.80,7.50,21-11-2017,19:19:43
-  if (++index >= 6) index = 0;
+  t = -5.4;
+  if (!isnan(t)) {
+    if (isnan(max_t)) 
+      max_t = t; 
+    if (isnan(min_t)) 
+      min_t = t;
+    if (t > max_t) 
+      max_t = t;
+    if (t < min_t)
+      min_t = t;  
+  }
 }
 
-void writeData() {
-  if (!SD.begin(SS))
+void writeBuff() {
+  cardInserted = SD.begin(SS);
+  if (!cardInserted) 
     return;
-  if (dataFile.open("data.txt", O_WRITE | O_CREAT)) {
-    for (uint8_t i = 0; i <= 6; i++) {
-      dataFile.seekEnd();
-      dataFile.write(dataString[i]);
-    }
-  dataFile.close();
-  freeSpace = 0.000512*SD.vol()->freeClusterCount()*SD.vol()->blocksPerCluster(); //MB (MB = 1,000,000 bytes)  
+
+  char dataString[31];
+  if (!isnan(h)) {
+    dtostrf(h, 4, 1, dataString);
+    dataString[4] = ',';
+  } 
+  if (!isnan(t)) {
+    dtostrf(t, 4, 1, dataString+5);
+    dataString[9] = ','; 
   }
+  sprintf(dataString+10, "%02d-%02d-%d,%02d:%02d:%02d\r\n", day(), month(), year(), hour(), minute(), second()); //fill data string array like 45.80,7.50,21-11-2017,19:19:43
+  PRINT("dataString:",dataString);
+  if (!dataFile.isOpen())
+    dataFile.open("data.txt", O_WRITE | O_CREAT);
+  dataFile.seekEnd();
+  dataFile.write(dataString);
+  PRINTLNF("buff write"); 
+}
+
+void writeCard() {
+  cardInserted = SD.begin(SS);
+  if (!cardInserted) 
+    return;
+
+  dataFile.close();
+  freeSpace = cardFreeSpace();
+  PRINTLNF("card write"); 
 }
 
 void setup() {
   Serial.begin(9600);
 
-  u8g.setContrast(110);
+  setSyncProvider(RTC.get); //the function to get the time from the RTC
+  setSyncInterval(1800); //once a 30 min sync
 
-  time.begin();  
-  time.period(10); //poll module once a 30 min
+  u8g.setContrast(115); //TODO add auto contrast
 
   dht.begin();
-
-  // SD.begin(SS);
-  dataFile.dateTimeCallback(dateTime); //set timestamp callback
-
+  
+  cardInserted = SD.begin(SS);
+  if (cardInserted) 
+    freeSpace = cardFreeSpace();
+    
+  PRINTLN("freeSpace = ",freeSpace);
+  dataFile.dateTimeCallback(dateTime); //set timestamp callback for files
+  
+  // min_t = dht.readTemperature(); //set min temp
   readData();
 
   timer.setInterval(1000L, draw);
-  timer.setInterval(5000L, readData);
-  // timer.setInterval(6000L, writeData);
+  timer.setInterval(5000L, readData); //5 sec
+  // timer.setInterval(10000L, writeBuff); 
+  // timer.setInterval(600000L, writeBuff); //10 min
+  // timer.setInterval(3600000L, writeCard); //1 hour
 }
 
 void loop() {
   timer.run();
-  // if (millis()%1000==0) {//draw once a second
-  //   draw();
-    
-  // }
-  // if (time.seconds%5==0) // 5 sec
-    // readData();
-  // delay(1);
-  // if (millis()%55000==0) //1 hour
-    // writeData();
 }
