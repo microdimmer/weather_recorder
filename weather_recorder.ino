@@ -8,7 +8,7 @@
 
 #include "graphics.h"
 
-#define DEBUG
+// #define DEBUG
 
 DHT dht(2, DHT22); //Aosong AM2320, D2 pin
 U8GLIB_PCD8544 u8g(4, 5, 6); //RST D6 pin, CE D4 pin, DC (data/commands) D5 pin,CLK D13 pin, DIN D11 pin PCD8544 48x84
@@ -17,10 +17,14 @@ SdFat SD; //CS D10 pin, SCK D13 pin, MISO D12 pin, MOSI D11 pin
 SimpleTimer timer;
 File dataFile;
 float freeSpace; 
-float h,t,max_t,min_t = NAN;
-
+float h = NAN;
+float t = NAN;
+float min_t = NAN;
+float max_t = NAN;
 bool cardInserted = false;
 bool dotsBlink = false;
+
+// const float typVbg = 0.95;
 
 #ifdef DEBUG
 #define PRINTLNF(s)   { Serial.println(F(s)); }
@@ -39,7 +43,7 @@ void dateTime(uint16_t* fileDate, uint16_t* fileTime) { //callback for timestamp
 
 float cardFreeSpace() { 
   return 0.000488 * SD.vol()->freeClusterCount() * SD.vol()->blocksPerCluster();  //MB (MB = 1,048,576 bytes)
-  // freeSpace = 0.000512*SD.vol()->freeClusterCount()*SD.vol()->blocksPerCluster(); //MB (MB = 1,000,000 bytes)
+  // return 0.000512*SD.vol()->freeClusterCount()*SD.vol()->blocksPerCluster(); //MB (MB = 1,000,000 bytes)
 }
 
 void draw() {
@@ -71,7 +75,7 @@ void draw() {
     dotsBlink ? sprintf(out_str,"%02d %02d",hour(),minute()) : sprintf(out_str,"%02d:%02d",hour(),minute()); //draw time
     u8g.drawStr(0, 13, out_str);
 
-    u8g.setFont(u8g_font_6x13Br);
+    u8g.setFont(u8g_font_6x13Br); 
     if (max_t > 0) //print max temperature
       u8g.drawStr(54, 26, "+"); 
     else if (max_t < 0) 
@@ -86,18 +90,26 @@ void draw() {
     u8g.drawStr(60, 42, out_str); 
 
     u8g.setFont(u8g_font_4x6r);
-    u8g.drawStr(57, 31, "max");
-    u8g.drawStr(70, 31, "t");
+    u8g.drawStr(57, 32, "max");
+    u8g.drawStr(70, 32, "t");
     u8g.drawStr(57, 48, "min");
     u8g.drawStr(70, 48, "t");
 
 
     if (cardInserted) { //draw free space
       u8g.setFont(u8g_font_6x13Br);
-      dtostrf(freeSpace, 4, 1, out_str); 
+      if (freeSpace>=1024) 
+        dtostrf(freeSpace/1024, 3, 1, out_str);
+      else if (freeSpace>=100) 
+        sprintf(out_str,"%d",static_cast<int>(freeSpace));
+      else 
+         dtostrf(freeSpace, 4, 1, out_str); 
       u8g.drawStr(59, 9, out_str);
       u8g.setFont(u8g_font_4x6r);
-      u8g.drawStr(57, 15, "free MB");
+      if (freeSpace>=1024)
+        u8g.drawStr(57, 15, "free GB");
+      else
+        u8g.drawStr(57, 15, "free MB");
     }
   } while( u8g.nextPage() );
   dotsBlink ^=1; //dots blicking
@@ -106,17 +118,16 @@ void draw() {
 void readData() {
   h = dht.readHumidity();
   t = dht.readTemperature();
-  t = -5.4;
+  // t = -25.1;
   if (!isnan(t)) {
     if (isnan(max_t)) 
       max_t = t; 
     if (isnan(min_t)) 
       min_t = t;
-    if (t > max_t) 
-      max_t = t;
-    if (t < min_t)
-      min_t = t;  
+    max_t =  max(t,max_t);
+    min_t =  min(t,min_t);
   }
+  // PRINTLN("Vcc= ",readVcc());
 }
 
 void writeBuff() {
@@ -152,8 +163,30 @@ void writeCard() {
   PRINTLNF("card write"); 
 }
 
+// float readVcc() {
+//   byte i;
+//   float result = 0.0;
+//   float tmp = 0.0;
+//   for (i = 0; i < 5; i++) {
+//     ADMUX = _BV(REFS0) | _BV(MUX3) | _BV(MUX2) | _BV(MUX1);// set the reference to Vcc and the measurement to the internal 1.1V reference
+//     delay(3); // Wait for Vref to settle
+//     ADCSRA |= _BV(ADSC); // Start conversion
+//     while (bit_is_set(ADCSRA,ADSC)); // measuring
+//     uint8_t low  = ADCL; // must read ADCL first - it then locks ADCH
+//     uint8_t high = ADCH; // unlocks both
+//     tmp = (high<<8) | low;
+//     tmp = (typVbg * 1023.0) / tmp;
+//     result = result + tmp;
+//     delay(5);
+//   }
+//   result = result / 5;
+//   return result;
+// }
+
 void setup() {
+  #ifdef DEBUG
   Serial.begin(9600);
+  #endif
 
   setSyncProvider(RTC.get); //the function to get the time from the RTC
   setSyncInterval(1800); //once a 30 min sync
@@ -169,14 +202,13 @@ void setup() {
   PRINTLN("freeSpace = ",freeSpace);
   dataFile.dateTimeCallback(dateTime); //set timestamp callback for files
   
-  // min_t = dht.readTemperature(); //set min temp
   readData();
 
   timer.setInterval(1000L, draw);
   timer.setInterval(5000L, readData); //5 sec
   // timer.setInterval(10000L, writeBuff); 
-  // timer.setInterval(600000L, writeBuff); //10 min
-  // timer.setInterval(3600000L, writeCard); //1 hour
+  timer.setInterval(600000L, writeBuff); //10 min
+  timer.setInterval(3600000L, writeCard); //1 hour write data buff to card 
 }
 
 void loop() {
