@@ -1,6 +1,7 @@
-# Arduino weather recorder
+# Arduino SD card weather recorder
 
-Clock with
+Weather station based on DS3231 with data recording function (humidity and temperature).
+Humidity and temperature is measuring every 10 minutes. Every 1 hour data is recording to SD card.
 
 ## Components
 
@@ -13,91 +14,37 @@ Clock with
 
 ## Photos:
 ![PHOTO1](https://github.com/microdimmer/weather_recorder/blob/master/readme/front.jpg)
-![PHOTO2](https://github.com/microdimmer/weather_recorder/blob/master/readme/disassembled.jpg)
 
 ## Libraries
 
-* [Arduino-esp8266](https://github.com/esp8266/Arduino)
-* [Blynk](https://github.com/blynkkk/blynk-library)
-* [u8g2](https://github.com/olikraus/u8g2)
-* [Adafruit_BME280_Library](https://github.com/adafruit/Adafruit_BME280_Library)
-* [WiFiManager](https://github.com/tzapu/WiFiManager)
-* [ArduinoJson](https://github.com/bblanchon/ArduinoJson)
-* [AsyncPing](https://github.com/akaJes/AsyncPing)
+* [Adafruit_Sensor](https://github.com/adafruit/Adafruit_Sensor)
+* [SdFat](https://github.com/greiman/SdFat)
+* [u8glib](https://github.com/olikraus/U8glib_Arduino
+* [DS3232RTC](https://github.com/JChristensen/DS3232RTC)
 * [SimpleTimer](http://playground.arduino.cc/Code/SimpleTimer)
 * [TimeLibrary](https://github.com/PaulStoffregen/Time)
 
-## Wiring:
-```
-ST7920
-RS - D8
-R/W - D7
-E - D6
-backlight - D3
-
-mh-z19
-RX - D4
-TX - D5
-
-BME-280
-SDA - D1
-SCL - D2
-VCC - 3V3
-```
-
 ## Scheme:
-![СХЕМА](https://github.com/microdimmer/homeweather_esp8266/blob/master/readme/scheme.png)
-
-## Known issues:
-
-* Temperature measurements seems to be higher due to heat from ESP8266
-* ST7920 plate need to be cutted to fit enclosure
-* Can't connect to my old ASUS WL-500gP V2
+![СХЕМА](https://github.com/microdimmer/weather_recorder/blob/master/readme/scheme.png)
 
 # Russian:
-Часы с синхронизацией времени по WI-FI, функцией измерения CO2, температуры, влажности, давления. Также есть автоматическое изменение подсветки в зависимости от освещения.
-Часы синхронизируются по NTP протоколу через WI-FI. Данные датчиков передаются на сервер Blynk.
+Погодная станция, основанная на точном модуле DS3231 с функцией записи температуры и влажности на SD-карту.
+Измеряются показания температуры и влажности с привязкой ко времени каждые 10 минут, данные записываются пачкой каждый час.
 
 ## Компоненты
 
-* Датчик CO2 MH-Z19
-* NodeMCU v2
-* ST7920 128x64 LCD-дисплей
-* датчик давления/влажности/температуры BME280
-* фоторезистор 5528 LDR
-* кнопки, резисторы, провода, корпус
+* Arduino Nano
+* Датчик температуры и влажности Aosong AM2320
+* Дисплей Nokia 5110 
+* Модуль точного времени DS3231
+* SD-кардридер
+* провода, корпус
 
 ## Библиотеки
 
-* [Arduino-esp8266](https://github.com/esp8266/Arduino)
-* [Blynk](https://github.com/blynkkk/blynk-library)
-* [u8g2](https://github.com/olikraus/u8g2)
-* [Adafruit_BME280_Library](https://github.com/adafruit/Adafruit_BME280_Library)
-* [WiFiManager](https://github.com/tzapu/WiFiManager)
-* [ArduinoJson](https://github.com/bblanchon/ArduinoJson)
-* [AsyncPing](https://github.com/akaJes/AsyncPing)
+* [Adafruit_Sensor](https://github.com/adafruit/Adafruit_Sensor)
+* [SdFat](https://github.com/greiman/SdFat)
+* [u8glib](https://github.com/olikraus/U8glib_Arduino
+* [DS3232RTC](https://github.com/JChristensen/DS3232RTC)
 * [SimpleTimer](http://playground.arduino.cc/Code/SimpleTimer)
 * [TimeLibrary](https://github.com/PaulStoffregen/Time)
-
-## Подключение:
-```
-дисплей 12864 
-RS - D8
-R/W - D7
-E - D6
-катод подсветки - D3
-
-датчик mh-z19
-RX - D4
-TX - D5
-
-датчик BME-280
-SDA - D1
-SCL - D2
-VCC - 3V3
-```
-## Известные проблемы:
-
-* ESP8266 греется и вносит погрешность в показания температуры, пока изолировал датчик BME-280 вспененным полиэтиленом
-* Пришлось немного подрезать плату дисплея ST7920 сверху, не входила по высоте
-* Не удалось подключить к роутеру ASUS WL-500gP V2 (видимо нужно разбираться с типом WI-FI сети на роутере)

@@ -22,9 +22,8 @@ float t = NAN;
 float min_t = NAN;
 float max_t = NAN;
 bool cardInserted = false;
+bool dataWriteOK = false;
 bool dotsBlink = false;
-
-// const float typVbg = 0.95;
 
 #ifdef DEBUG
 #define PRINTLNF(s)   { Serial.println(F(s)); }
@@ -95,7 +94,6 @@ void draw() {
     u8g.drawStr(57, 48, "min");
     u8g.drawStr(70, 48, "t");
 
-
     if (cardInserted) { //draw free space
       u8g.setFont(u8g_font_6x13Br);
       if (freeSpace>=1024) 
@@ -104,12 +102,15 @@ void draw() {
         sprintf(out_str,"%d",static_cast<int>(freeSpace));
       else 
          dtostrf(freeSpace, 4, 1, out_str); 
-      u8g.drawStr(59, 9, out_str);
+      u8g.drawStr(60, 9, out_str);
       u8g.setFont(u8g_font_4x6r);
       if (freeSpace>=1024)
         u8g.drawStr(57, 15, "free GB");
       else
         u8g.drawStr(57, 15, "free MB");
+      if (dataWriteOK) {
+         u8g.drawXBMP(51, 1, 7, 7, save_bitmap);  
+      } 
     }
   } while( u8g.nextPage() );
   dotsBlink ^=1; //dots blicking
@@ -127,7 +128,6 @@ void readData() {
     max_t =  max(t,max_t);
     min_t =  min(t,min_t);
   }
-  // PRINTLN("Vcc= ",readVcc());
 }
 
 void writeBuff() {
@@ -157,31 +157,11 @@ void writeCard() {
   cardInserted = SD.begin(SS);
   if (!cardInserted) 
     return;
-
+  dataFile.sync() ? dataWriteOK = 1 : dataWriteOK = 0;
   dataFile.close();
   freeSpace = cardFreeSpace();
   PRINTLNF("card write"); 
 }
-
-// float readVcc() {
-//   byte i;
-//   float result = 0.0;
-//   float tmp = 0.0;
-//   for (i = 0; i < 5; i++) {
-//     ADMUX = _BV(REFS0) | _BV(MUX3) | _BV(MUX2) | _BV(MUX1);// set the reference to Vcc and the measurement to the internal 1.1V reference
-//     delay(3); // Wait for Vref to settle
-//     ADCSRA |= _BV(ADSC); // Start conversion
-//     while (bit_is_set(ADCSRA,ADSC)); // measuring
-//     uint8_t low  = ADCL; // must read ADCL first - it then locks ADCH
-//     uint8_t high = ADCH; // unlocks both
-//     tmp = (high<<8) | low;
-//     tmp = (typVbg * 1023.0) / tmp;
-//     result = result + tmp;
-//     delay(5);
-//   }
-//   result = result / 5;
-//   return result;
-// }
 
 void setup() {
   #ifdef DEBUG
@@ -191,7 +171,7 @@ void setup() {
   setSyncProvider(RTC.get); //the function to get the time from the RTC
   setSyncInterval(1800); //once a 30 min sync
 
-  u8g.setContrast(115); //TODO add auto contrast
+  u8g.setContrast(125);
 
   dht.begin();
   

@@ -31,3 +31,13 @@ static const uint8_t temp_bitmap[] U8G_PROGMEM  = { // 8x14
   0x22,
   0x1C
 };
+
+static const uint8_t save_bitmap[] U8G_PROGMEM = { //7x7
+  0x9F,
+  0xB5,
+  0xED,
+  0xC1,
+  0xDD,
+  0xD5,
+  0xFF
+};
