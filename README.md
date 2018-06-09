@@ -44,7 +44,7 @@ Humidity and temperature is measuring every 10 minutes. Every 1 hour data is rec
 
 * [Adafruit_Sensor](https://github.com/adafruit/Adafruit_Sensor)
 * [SdFat](https://github.com/greiman/SdFat)
-* [u8glib](https://github.com/olikraus/U8glib_Arduino
+* [u8glib](https://github.com/olikraus/U8glib_Arduino)
 * [DS3232RTC](https://github.com/JChristensen/DS3232RTC)
 * [SimpleTimer](http://playground.arduino.cc/Code/SimpleTimer)
 * [TimeLibrary](https://github.com/PaulStoffregen/Time)
