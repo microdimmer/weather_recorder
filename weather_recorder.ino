@@ -135,7 +135,7 @@ void writeBuff() {
   if (!cardInserted) 
     return;
 
-  char dataString[31];
+  char dataString[30];
   if (!isnan(h)) {
     dtostrf(h, 4, 1, dataString);
     dataString[4] = ',';
@@ -148,7 +148,8 @@ void writeBuff() {
   PRINT("dataString:",dataString);
   if (!dataFile.isOpen())
     dataFile.open("data.txt", O_WRITE | O_CREAT);
-  dataFile.seekEnd();
+  else 
+    dataFile.seekEnd();
   dataFile.write(dataString);
   PRINTLNF("buff write"); 
 }
@@ -171,7 +172,7 @@ void setup() {
   setSyncProvider(RTC.get); //the function to get the time from the RTC
   setSyncInterval(1800); //once a 30 min sync
 
-  u8g.setContrast(125);
+  u8g.setContrast(116);
 
   dht.begin();
   
@@ -186,7 +187,6 @@ void setup() {
 
   timer.setInterval(1000L, draw);
   timer.setInterval(5000L, readData); //5 sec
-  // timer.setInterval(10000L, writeBuff); 
   timer.setInterval(600000L, writeBuff); //10 min
   timer.setInterval(3600000L, writeCard); //1 hour write data buff to card 
 }
