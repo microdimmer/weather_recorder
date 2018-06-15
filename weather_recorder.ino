@@ -21,6 +21,11 @@ float h = NAN;
 float t = NAN;
 float min_t = NAN;
 float max_t = NAN;
+uint8_t max_day;
+uint8_t max_month;
+uint8_t min_day;
+uint8_t min_month;
+
 bool cardInserted = false;
 bool dataWriteOK = false;
 bool dotsBlink = false;
@@ -52,66 +57,78 @@ void draw() {
     u8g.drawXBMP(0, 18, 16, 14, hum_bitmap);
     u8g.drawXBMP(0, 34, 8, 14, temp_bitmap);
     u8g.setFont(u8g_font_10x20r);
-    if (!isnan(h)) {
+
+    sprintf(out_str,"%02d",hour()); //draw time
+    u8g.drawStr(0, 13, out_str);
+    if (dotsBlink) u8g.drawStr(18, 12, ":");
+    sprintf(out_str,"%02d",minute());
+    u8g.drawStr(27, 13, out_str);
+
+    if (!isnan(h)) { //draw humidity
       sprintf(out_str,"%02d",static_cast<int>(h)); 
-      u8g.drawStr(18, 31, out_str); //print decimal
-      u8g.drawStr(34, 31, ".");
+      u8g.drawStr(17, 31, out_str); //print decimal
+      u8g.drawStr(33, 31, ".");
       dtostrf(h, 4, 1, out_str);
-      u8g.drawStr(42,31, out_str+3); //print precision
+      u8g.drawStr(40,31, out_str+3); //print precision
     }
-    if (!isnan(t)) {
+    if (!isnan(t)) { //draw temp
       (t > 0) ? u8g.drawStr(8, 48, "+") : u8g.drawStr(8, 48, "-");
       float t_abs = abs(t); 
       uint8_t x = 0;
       if (t_abs < 10) 
         x = 10;
       sprintf(out_str,"%d",static_cast<int>(t_abs));
-      u8g.drawStr(18, 48, out_str); //print decimal
-      u8g.drawStr(34-x, 48, ".");
+      u8g.drawStr(17, 48, out_str); //print decimal
+      u8g.drawStr(33-x, 48, ".");
       dtostrf(t_abs, 4, 1, out_str);
-      u8g.drawStr(42-x, 48, out_str+3); //print precision
+      u8g.drawStr(40-x, 48, out_str+3); //print precision
     }
-    dotsBlink ? sprintf(out_str,"%02d %02d",hour(),minute()) : sprintf(out_str,"%02d:%02d",hour(),minute()); //draw time
-    u8g.drawStr(0, 13, out_str);
-
-    u8g.setFont(u8g_font_6x13Br); 
+    u8g.setFont(u8g_font_6x12r);
     if (max_t > 0) //print max temperature
-      u8g.drawStr(54, 26, "+"); 
+      u8g.drawStr(53, 24, "+"); 
     else if (max_t < 0) 
-      u8g.drawStr(54, 26, "-"); 
+      u8g.drawStr(53, 24, "-"); 
     dtostrf(abs(max_t), 4, 1, out_str);
-    u8g.drawStr(60, 26, out_str); 
+    u8g.drawStr(60, 24, out_str); 
     if (min_t > 0) //print min temperature
-      u8g.drawStr(54, 42, "+");
+      u8g.drawStr(53, 41, "+");
     else if (min_t < 0)
-      u8g.drawStr(54, 42, "-"); 
+      u8g.drawStr(53, 41, "-"); 
     dtostrf(abs(min_t), 4, 1, out_str);
-    u8g.drawStr(60, 42, out_str); 
-
-    u8g.setFont(u8g_font_4x6r);
-    u8g.drawStr(57, 32, "max");
-    u8g.drawStr(70, 32, "t");
-    u8g.drawStr(57, 48, "min");
-    u8g.drawStr(70, 48, "t");
+    u8g.drawStr(60, 41, out_str); 
 
     if (cardInserted) { //draw free space
-      u8g.setFont(u8g_font_6x13Br);
       if (freeSpace>=1024) 
         dtostrf(freeSpace/1024, 3, 1, out_str);
       else if (freeSpace>=100) 
         sprintf(out_str,"%d",static_cast<int>(freeSpace));
       else 
          dtostrf(freeSpace, 4, 1, out_str); 
-      u8g.drawStr(60, 9, out_str);
+      u8g.drawStr(60, 7, out_str);
       u8g.setFont(u8g_font_4x6r);
       if (freeSpace>=1024)
-        u8g.drawStr(57, 15, "free GB");
+        u8g.drawStr(57, 14, "free GB");
       else
-        u8g.drawStr(57, 15, "free MB");
+        u8g.drawStr(57, 14, "free MB");
       if (dataWriteOK) {
-         u8g.drawXBMP(51, 1, 7, 7, save_bitmap);  
+         u8g.drawXBMP(51, 0, 7, 7, save_bitmap);  
       } 
     }
+
+    u8g.setFont(u8g_font_4x6r); //draw min max date
+    u8g.drawStr(53, 31, "max");
+    sprintf(out_str,"%02d",max_day);
+    u8g.drawStr(67, 31, out_str);
+    u8g.drawStr(74, 31, ".");
+    sprintf(out_str,"%02d",max_month);
+    u8g.drawStr(77, 31, out_str);
+    u8g.drawStr(53, 48, "min");
+    sprintf(out_str,"%02d",min_day);
+    u8g.drawStr(67, 48, out_str);
+    u8g.drawStr(74, 48, ".");
+    sprintf(out_str,"%02d",min_month);
+    u8g.drawStr(77, 48, out_str);
+
   } while( u8g.nextPage() );
   dotsBlink ^=1; //dots blicking
 }
@@ -119,14 +136,17 @@ void draw() {
 void readData() {
   h = dht.readHumidity();
   t = dht.readTemperature();
-  // t = -25.1;
   if (!isnan(t)) {
-    if (isnan(max_t)) 
-      max_t = t; 
-    if (isnan(min_t)) 
+    if (isnan(max_t) || (t > max_t)) {
+      max_t = t;
+      max_day = day();
+      max_month = month(); 
+    }
+    if (isnan(min_t) || (t < min_t)) {
       min_t = t;
-    max_t =  max(t,max_t);
-    min_t =  min(t,min_t);
+      min_day = day();
+      min_month = month();
+    }
   }
 }
 
@@ -135,7 +155,7 @@ void writeBuff() {
   if (!cardInserted) 
     return;
 
-  char dataString[30];
+  char dataString[32];
   if (!isnan(h)) {
     dtostrf(h, 4, 1, dataString);
     dataString[4] = ',';
@@ -148,7 +168,7 @@ void writeBuff() {
   PRINT("dataString:",dataString);
   if (!dataFile.isOpen())
     dataFile.open("data.txt", O_WRITE | O_CREAT);
-  else 
+  // else 
     dataFile.seekEnd();
   dataFile.write(dataString);
   PRINTLNF("buff write"); 
@@ -172,7 +192,7 @@ void setup() {
   setSyncProvider(RTC.get); //the function to get the time from the RTC
   setSyncInterval(1800); //once a 30 min sync
 
-  u8g.setContrast(116);
+  u8g.setContrast(114);
 
   dht.begin();
   
