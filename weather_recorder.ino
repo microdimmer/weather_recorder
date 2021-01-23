@@ -1,10 +1,10 @@
 #include <SPI.h>
-#include <Adafruit_sensor.h>
-#include <DHT.h>
-#include <SdFat.h>
+#include <Adafruit_Sensor.h>  //https://github.com/adafruit/Adafruit_Sensor
+#include <DHT.h> // https://github.com/adafruit/DHT-sensor-library
+#include <SdFat.h>  // https://github.com/greiman/SdFat (version 1.1.4)
 #include <DS3232RTC.h>      // https://github.com/JChristensen/DS3232RTC /SDA A4 pin, SCL A5 pin
-#include <SimpleTimer.h> 
-#include <U8glib.h>
+#include <SimpleTimer.h>  // https://playground.arduino.cc/Code/SimpleTimer/ or https://github.com/jfturcot/SimpleTimer
+#include <U8glib.h> // https://github.com/olikraus/U8glib_Arduino
 
 #include "graphics.h"
 
